@@ -1,0 +1,49 @@
+# Bu alıştırma front-end ve database servislerini tanımlarken aynı zamanda volume ve network oluşturmanın alıştırmasıdır.
+# services altında iki tane container tanımlayacağız.
+# İlk container veritabani ismini alacak. verilerim isminde volume'e sahip olacak. Aynı zamanda wpnet networküne bağlı olacak.
+# İkinci container wordpress container'ı wordpress ismini alacak. veritabanına bağımlı olacak ve 80:80 portundan publish edilecek.
+
+
+
+
+version: "3.7" # Docker compose versiyonu
+
+services: # Servislerin tanımlandığı top level element
+  veritabani: # Veritabanı servisinin isimlendirmesi ve tanımlanması
+    image: mysql:5.7 # Veritabani servisinin oluşturulacağı imaj
+    restart: always # Bu serviste herhangi bir problem olduğunda container davranışı
+    volumes: # veritabani servisi altında volume tanımlama
+      - verilerim:/var/lib/mysql # volumeName:ContainerPath docker container run -v verilerim:/var/lib/mysql compose karşılığı
+    environment: # mysql imajının düzgün çalışabilmesi için gerekli environment variable'ları tanımlama
+      MYSQL_ROOT_PASSWORD: somewordpress
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+    networks: # veritabani imajını wpnet networküne bağlama.
+      - wpnet # Birden fazla network'e bağlanabileceği için tanımlar liste şeklinde
+
+  wordpress: # wordpress isimli servisi oluşturma
+    image: wordpress:latest # worpress servisinin hangi imajdan oluşacağını belirleme
+    depends_on: # veritabanina bağlılığını belirleme
+      - veritabani
+    restart: always # veritabani servisinde problem olması halinde yapılacak aksiyonu belirleme
+    ports: # Port publish için tanım
+      - "80:80" # Port birden fazla publish edilebileceği için liste şeklinde tanımlanır. Format hostPort:ContainerPort şeklindedir.
+    environment: # Wordpress servisinin veritabani servisine bağlanabilmesi için gerekli environment variable tanımlama
+      WORDPRESS_DB_HOST: veritabani:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+
+networks:
+  wpnet: # wpnet isminde network oluşturma
+    driver: bridge # wpnet network'ünün driver'ını belirtme
+
+volumes:
+  verilerim: # Verilerim isminde lokal volume yaratma.
+
+
+
+
+
+  

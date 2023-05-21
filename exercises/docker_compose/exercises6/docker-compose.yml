@@ -1,0 +1,36 @@
+version: "3.7" # docker file versiyonu
+
+services:
+  database: # database isimli servis yaratma
+    image: mysql:5.7 # mysql:5.7 imajını kullanma
+    environment:
+      MYSQL_DATABASE: wordpress # database isim verme
+      MYSQL_USER: wordpress # database userı tanımlama
+      MYSQL_PASSWORD: /run/secrets/db_password # container'ın içerisinden secret'i okuma
+    secrets:
+      - db_password # db_password secret assign etme
+    networks:
+      - over-net # over-net network'e ekleme
+  
+  wordpress: # wordpress isimli servis yaratma
+    image: wordpress:latest # wordpress latest imajını kullanma
+    depends_on: 
+      - database # database servisini dependency olarak set etme
+    ports:
+      - "8080:80" # publish
+    environment:
+      WORDPRESS_DB_HOST: database
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password 
+
+networks:
+  over-net:
+    driver: overlay
+
+secrets:
+  db_password:
+    file: ./db_password.txt
+  
+

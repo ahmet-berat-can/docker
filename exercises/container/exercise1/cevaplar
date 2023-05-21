@@ -1,0 +1,144 @@
+1: Öncelikle sistemdeki tüm container, image ve volumeleri görelim. Bunun için ayrı ayrı listeleme komutlarını girelim. Ve ardından temizlik yapmak adına makinenizdeki tüm containerları, imageleri ve volumeleri temizleyelim. Bunun iki yöntemi var. Bakalım siz kolay olanı mı seçeceksiniz. 
+# İmajları, container’ları , volumleri görüntüleme
+docker container ls veya docker ps -a
+docker image ls
+docker volume ls
+
+# Temizlik
+docker container rm -f $(docker ps -aq)
+docker image prune -a
+docker volume prune
+
+
+2: centos, alpine, nginx, httpd:alpine, ozgurozturknet/adanzyedocker, ozgurozturknet/hello-app, ozgurozturknet/app1 isimli imajları çalıştığımız sisteme çekelim. 
+
+docker image pull centos; docker image pull alpine;docker image pull httpd:alpine;docker image pull ozgurozturknet/adanzyedocker;docker image pull ozgurozturknet/hello-app;docker image pull ozgurozturknet/app1
+
+3: ozgurozturknet/app1 isimli imajdan bir container yaratalım.
+
+docker container run ozgurozturknet/app1
+Merhaba arkadaslar ben App1 uygulamasiyim
+
+4: httpd:alpine isimli imajdan detached bir container yaratalım. Yarattığımız container ismini ve id’sini görelim. 
+
+[root@localhost ~]# docker container run -d httpd:alpine
+cff58c99eb776cdef5230c7ba086e98c307300e078dcf5d72779d2b4b514160f
+[root@localhost ~]# docker ps
+CONTAINER ID   IMAGE          COMMAND              CREATED         STATUS         PORTS     NAMES
+cff58c99eb77   httpd:alpine   "httpd-foreground"   6 seconds ago   Up 5 seconds   80/tcp    stoic_dif                          fie
+[root@localhost ~]#
+
+
+5: Yarattığımız bu contaier’ın loglarına bakalım.
+
+[root@localhost ~]# docker container logs -f stoic_diffie
+AH00558: httpd: Could not reliably determine the server's fully qualified domain name, using 172.17.0.2. Set the 'ServerName' directive globally to suppress this message
+AH00558: httpd: Could not reliably determine the server's fully qualified domain name, using 172.17.0.2. Set the 'ServerName' directive globally to suppress this message
+[Fri May 19 21:05:05.606762 2023] [mpm_event:notice] [pid 1:tid 140364320009032] AH00489: Apache/2.4.57 (Unix) configured -- resuming normal operations
+[Fri May 19 21:05:05.606862 2023] [core:notice] [pid 1:tid 140364320009032] AH00094: Command line: 'httpd -D FOREGROUND
+
+6: Container’ı durduralım, ardından yeniden çalıştıralım ve son olarak container’ı sistemden kaldıralım. 
+
+[root@localhost ~]# docker container stop stoic_diffie
+stoic_diffie
+[root@localhost ~]# clear
+[root@localhost ~]# docker container start stoic_diffie
+stoic_diffie
+[root@localhost ~]# docker container rm -f stoic_diffie
+stoic_diffie
+[root@localhost ~]#
+
+7: ozgurozturknet/adanzyedocker isimli imajdan websunucu adında detached ve “-p 80:80” ile portu publish edilmiş bir container yaratalım. Kendi bilgisayarımızın browserından bu web sitesine erişelim.
+
+docker container run -d -p 80:80 ozgurozturknet/adanzyedocker 
+
+8: websunucu adlı bu container’ın içerisine bağlanalım. /usr/local/apache2/htdocs klasörünün altına geçelim ve echo “denemedir” >> index.html komutuyla buradaki dosyaya denemedir yazısını ekleyelim. Web tarayıcıya geçerek dosyaya ekleme yapabildiğimizi görmek için refresh edelim. Sonrasında container içerisinden exit ile çıkalım.
+
+[root@localhost ~]# docker container run -d -p 80:80 --name websunucu ozgurozturknet/adanzyedocker
+71a8bc2d73d97a72d02ea8ac42da40379b45c95b02d623ed81a8c9266613e6af
+[root@localhost ~]# docker container exec -it websunucu sh
+/usr/src/myapp # cd /usr/local/apache2/htdocs
+/usr/local/apache2/htdocs # echo "denemedir" >> index.html
+/usr/local/apache2/htdocs #
+
+9: websunucu isimli container’ı çalışırken silelim.
+
+docker container rm -f websunucu
+
+10: alpine isimli imajdan bir container yaratalım. Ama varsayılan olarak çalışması gereken uygulama yerine “ls” uygulamasının çalışmasını sağlayalım.
+
+[root@localhost ~]# docker container run alpine ls
+bin
+dev
+etc
+home
+lib
+media
+mnt
+opt
+proc
+root
+run
+sbin
+srv
+sys
+tmp
+usr
+var
+[root@localhost ~]#
+
+11: “alistirma1” isimli bir volüme yaratalım. 
+
+[root@localhost ~]# docker volume create alistirma
+alistirma
+
+12: alpine isimli imajdan “birinci” isimli bir container yaratalım. Bu container’ı interactive modda yaratalım ve bağlanabilelim. Aynı zamanda “alistirma1” isimli volume’u bu containerın “/test” isimli folder’ına mount edelim. Bu folder içerisine geçelim ve “touch abc.txt” komutuyla bir dosya yaratalım daha sonra “echo deneme >> abc.txt” komutuyla bu dosyanın içerisine yazı ekleyelim. 
+
+[root@localhost ~]# docker container run -it --name birinci -v alistirma:/test alpine sh
+/ # ls
+bin    etc    lib    mnt    proc   run    srv    test   usr
+dev    home   media  opt    root   sbin   sys    tmp    var
+/ # cd /test
+/test # touch abc.txt
+/test # echo "deneme" >> abc.txt
+/test #
+
+13: alpine isimli imajdan “ikinci” isimli bir container yaratalım. Bu container’ı interactive modda yaratalım ve bağlanabilelim. Aynı zamanda “alistirma1” isimli volume’u bu containerın “/test” isimli folder’ına mount edelim. Bu folder içerisinde “ls” komutyla dosyaları listeleyelim ve abc.txt dosyası olduğunu görelim. “cat abc.txt” ile dosyanın içeriğini kontrol edelim. 
+
+[root@localhost ~]# docker container run -it --name ikinci -v alistirma:/test alpine sh
+/ # cd /test
+/test # cat abc.txt
+deneme
+/test #
+
+14: alpine isimli imajdan “ucuncu” isimli bir container yaratalım. Bu container’ı interactive modda yaratalım ve bağlanabilelim. Aynı zamanda “alistirma1” isimli volume’u bu containerın “/test” isimli folder’ına mount edelim fakat Read Only olarak mount edelim. Bu folder içerisine geçelim ve “touch abc1.txt” komutuyla bir dosya yaratmaya çalışalım. Ve yaratamadığımızı görelim.
+
+[root@localhost ~]# docker container run -it --name ucuncu -v alistirma1:/test:ro alpine sh
+/ # cd /test
+/test # touch abc.txt
+touch: abc.txt: Read-only file system
+/test #
+
+15: Bilgisayarımızda bir klasör yaratalım “örneğin c:\deneme” ve bu klasörün içerisinde index.html adlı bir dosya yaratıp bu dosyanın içerisine birkaç yazı ekleyelim.
+
+mkdir deneme
+cp ../index.html deneme/
+
+
+16: ozgurozturknet/adanzyedocker isimli imajdan websunucu1 adında detached ve “-p 80:80” ile portu publish edilmiş bir container yaratalım. Bilgisayarımızda yarattığımız klasörü container’ın içerisindeki /usr/local/apache2/htdocs klasörüne mount edelim. Web browser açarak 127.0.0.1’e gidelim ve sitemizi görelim. Daha sonra bilgisayarımızda yarattığımız klasörün içerisindeki index.html dosyasını edit edelim ve yeni yazılar ekleyelim. Web sayfasını refresh ederek bunların geldiğini görelim.
+
+[root@localhost deneme]# docker container run -d --name websunucu1 -p 80:80 -v /root/deneme:/usr/loca                          l/apache2/htdocs ozgurozturknet/adanzyedocker
+81507a5f6f2b96fd3ad77e85624b72d229716802b94c3ed59a2c1cb80e012f16
+
+echo “test” >> /root/deneme/index.html
+
+
+17: Tüm çalışan container’ları silelim.
+
+[root@localhost deneme]# docker container rm -f $(docker ps -aq)
+81507a5f6f2b
+67a59ffbc908
+1ffdf245d0ec
+0eeca9c0f3d1
+ab024839581e
+[root@localhost deneme]#

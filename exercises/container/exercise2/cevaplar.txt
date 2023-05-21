@@ -1,0 +1,81 @@
+1: İlk olarak sistemde bir temizlik yapalım ki alıştırmalarımızla çakışma olmasın. Varsa sistemdeki tüm containerları ve kullanıcı tanımlı bridge networkleri silelim.
+
+docker container rm -f $(docker ps -aq) # Up veya down bütün containerları siler.
+docker network rm -f network_ismi # networkleri siler.
+
+
+2: "alistirma-agi" adında ve 10.10.0.0/16 subnetinde, 10.10.10.0/24 ip-aralığından ip dağıtacak ve gateway olarak da 10.10.10.10 tanımlanacak bir kullanıcı tanımlı bridge network yaratalım. (bu sizin yerel ağınızda kullandığınız bir ağ aralığıysa başka bir cidr kullanabilirsiniz). Bu ağın özelliklerini inspect komutuyla kontrol edin. 
+
+docker network create --driver=bridge --subnet=10.10.0.0/16 --ip-range=10.10.10.0/24 --gateway=10.10.10.10 alistirma_agi 
+
+3: nginx imajının 1.16 versiyonundan web1 adından detached bir container yaratın. Bu containerı default bridge networküne değil de alistirma-agi networküne bağlı olarak yaratın. Host'un 8080 tcp portuna gelen isteklerin bu containerın 80 portuna gitmesini sağlayın.
+
+docker container run -d --name web1 --network alistirma_agi -p 8080:80 nginx:1.16
+
+4: Bu sisteme browser üzerinden erişin ve daha sonra bir kaç kez sayfayı refresh edin. Ardından bu container'ın loglarına erişerek az önceki erişimlerinizin loglarını kontrol edin. 
+
+docker container logs web1
+
+10.10.10.10 - - [21/May/2023:21:03:59 +0000] "GET / HTTP/1.1" 304 0 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36" "-"
+
+5: Container loglarını follow modunda takip ederken browser'dan bu web sitesinde olmayan bir url'e gitmeye çalışın. Örneğin xyz.html Bunun ürettiği hatayı canlı olarak loglardan takip edin. 
+
+docker container logs web1 -f
+
+
+10.10.10.10 - - [21/May/2023:21:05:19 +0000] "GET /test.html HTTP/1.1" 404 555 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36" "-"
+
+
+6: ozgurozturknet/adanzyedocker imajından test1 adından bir container yaratın. -dit ile yaratın sh shellini açın. Bu container default bridge network'e bağlı olsun. 
+
+docker container run -it --name test1 ozgurozturknet/adanzyedocker sh
+
+7: Bu container'ı "alistirma-agi" networküne de bağlayın.
+
+docker network connect alistirma_agi test1
+
+8: Container'a attach işlemiyle bağlanın ve container içerisinden web1'i pinglemeye çalışın. Container'ı kapamadan çıkın. 
+
+[root@localhost ~]# docker container attach test1
+/usr/src/myapp # ping web1
+PING web1 (10.10.10.0) 56(84) bytes of data.
+64 bytes from web1.alistirma_agi (10.10.10.0): icmp_seq=1 ttl=64 time=0.081 ms
+64 bytes from web1.alistirma_agi (10.10.10.0): icmp_seq=2 ttl=64 time=0.063 ms
+--- web1 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 4ms
+rtt min/avg/max/mdev = 0.063/0.072/0.081/0.009 ms
+/usr/src/myapp #
+
+
+9: Bu containerların çalıştığını kontrol edin ve ardından çalışıyor haldeyken bunları silin. 
+
+docker container ls
+docker container rm -f $(docker ps -aq)
+
+10: Terminalde eğitim klasörünün altındaki kisim4/bolum43 klasörüne geçin. 
+
+cd /root/AdanZyeDocker/kisim4/bolum43
+
+11: ozgurozturknet/webkayit imajından websrv adinda detached bir container yaratın. "alistirma-agi" networküne bağlı olsun. Maksimum 2 logical cpu kullanacak şekilde kısıtlansın. 80 portunu host üstündeki 80 portuyla publish edin. env.list dosyasının bu containera enviroment variable olarak aktarılmasını sağlayın. 
+
+docker container run -d --network alistirma_agi -p 80:80 --cpus="2" --env-file=env.list ozgurozturknet/webkayit
+
+12: ozgurozturknet/webdb imajından mysqldb adinda detached bir container yaratın. "alistirma-agi" networküne bağlı olsun. Maksimum 1gb memory kullanacak şekilde kısıtlansın. envmysql.list dosyasının bu containera enviroment variable olarak aktarılmasını sağlayın. 
+
+docker container run -d --name mysqldb --network alistirma_agi --memory=1g --env-file=envmysql.list ozgurozturknet/webdb
+
+13: mysqldb containerının loglarını kontrol ederek düzgün şekilde başlatılabildiğini teyit edin. 
+
+docker container logs mysqldb
+
+2023-05-21T21:18:40.117924Z 0 [Note] mysqld: ready for connections.
+Version: '5.7.28'  socket: '/var/run/mysqld/mysqld.sock'  port: 3306  MySQL Community Server (GPL)
+
+14: Browser'dan websrv container'ının yayınladığı web sitesine bağlanın. Karşınıza çıkan formu doldurup bir tane jpg dosyayı da seçerek add tuşuna basın. Ardından kayitlari gör diyerek işlemin başarılı olduğunu teyit edin. 
+
+başarılı
+
+15: Oluşturduğunuz containerları ve alistirma-agi'ni silin.
+
+docker container rm -f $(docker ps -aq)
+docker network rm -f alistirma_agi

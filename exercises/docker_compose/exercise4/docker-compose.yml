@@ -1,0 +1,47 @@
+# Bu alıştırma docker swarm servisleri yaratmak için, docker stack kullanma ve docker-compose.yml dosyasını buna göre düzenleme alıştırmasıdır.
+
+version: '3.7'
+
+services:
+   mysqldb:
+     image: ozgurozturknet/webdb
+     environment:
+      MYSQL_DATABASE: proje
+      MYSQL_USER: projemaster
+      MYSQL_PASSWORD: master1234
+      MYSQL_ROOT_PASSWORD: master1234
+     networks:
+      - webnet
+
+   websrv:
+     image: ozgurozturknet/webkayit
+     deploy: # Docker swarm servislerimizi oluştururken girdiğimiz replica  paralelisim gibi parametreleri burada gireceğiz.
+      replicas: 3
+      update_config: # Docker swarm davranışına ait configler bunun altında giriliyor.
+        parallelism: 2 # Aynı anda 2 container'da işlem yapabilmesini değiştiriyoruz
+        delay: 10s # Yapılan işlemler arasında 10s delay vermesi gerektiğini söylüyoruz.
+        order: stop-first # İlk olarak işlem yapacağı containerı durdurup diğerini oluşturmasını söylüyoruz.
+
+     depends_on:
+       - mysqldb
+     ports:
+       - "80:80"
+     restart: always
+     networks:
+       - webnet
+     environment:
+       DB_SERVER: mysqldb
+       DB_USERNAME: projemaster
+       DB_PASS: master1234
+       DB_NAME: proje
+networks:
+  webnet:
+    driver: overlay # Docker stack ile çalışacağımız için overlay network yaratıyoruz.
+
+
+#update_config hakkında: Bizim girdiğimiz config tanımları aslında desired state'tir. Örneğin servisimiz
+# 5 adet container'dan oluşsun gibi bir config girdiysek bu bizim desired state'imiz olur. Eğer containerlardan birinde
+# Bir sorun olursa docker swarm desired state ile current state'i karşılaştırır ve buna göre işlem yapar.
+# İlla containerlarda sorun olduğundaki davranışı değil update gibi işlemlerde de bu davranışı sergiler.
+
+# docker stack deploy -c docker-compose.yml ilkstack bu komutla örnek servis oluşturulabilir.
